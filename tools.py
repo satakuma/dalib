@@ -3,6 +3,7 @@ import numpy as np
 import random as rd
 from sys import stderr
 
+
 def resize_to_fit(x, y, target_size):
     assert x.size == y.size
     width, height = target_size
@@ -10,8 +11,10 @@ def resize_to_fit(x, y, target_size):
 
     ratio = max(width / twidth, height / theight)
     size_after = (int(twidth * ratio) + 1, int(theight * ratio) + 1)
-    x.resize(size_after, resample=Image.NEAREST)
-    y.resize(size_after, resample=Image.NEAREST)
+    x = x.resize(size_after, resample=Image.NEAREST)
+    y = y.resize(size_after, resample=Image.NEAREST)
+    
+    return (x, y)
 
 
 def random_crop_with_target(x, y, target_size):
@@ -20,16 +23,17 @@ def random_crop_with_target(x, y, target_size):
     twidth, theight = x.size
 
     if twidth < width or theight < height:
-        resize_to_fit(x, y, target_size)
+        x, y = resize_to_fit(x, y, target_size)
         print("Warning: had to resize an image before crop", file=stderr)
         return random_crop_with_target(x, y, target_size)
 
     left_corner = rd.randint(0, twidth - width)
     top_corner = rd.randint(0, theight - height)
-    x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
-    y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    x = x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    y = y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
 
     return (x, y)
+
 
 def random_crop(x, y, crop_ratio):
     assert x.size == y.size
@@ -40,20 +44,21 @@ def random_crop(x, y, crop_ratio):
 
     return random_crop_with_target(x, y, (width, height))
 
+
 def center_crop_with_target(x, y, target_size):
     assert x.size == y.size
     width, height = target_size
     twidth, theight = x.size
 
     if twidth < width or theight < height:
-        resize_to_fit(x, y, target_size)
+        x, y = resize_to_fit(x, y, target_size)
         print("Warning: had to resize an image before crop", file=stderr)
         return center_crop_with_target(x, y, target_size)
 
     left_corner = int(round(twidth / 2)) - int(round(width / 2))
     top_corner = int(round(theight / 2)) - int(round(height / 2))
-    x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
-    y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    x = x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    y = y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
 
     return (x, y)
 
@@ -72,12 +77,12 @@ def class_crop_with_target(x, y, target_size, clsid):
     twidth, theight = x.size
 
     if twidth < width or theight < height:
-        resize_to_fit(x, y, target_size)
+        x, y = resize_to_fit(x, y, target_size)
         print("Warning: had to resize an image before crop", file=stderr)
         return class_crop_with_target(x, y, target_size, clsid)
 
     arr = np.array(y.getdata(), dtype=np.uint16)
-    indices = list(np.where(arr == clsid))
+    indices = np.where(arr == clsid)[0].tolist()
     if len(indices) == 0:
         raise ValueError("Class not present in the given image")
 
@@ -86,8 +91,8 @@ def class_crop_with_target(x, y, target_size, clsid):
     
     left_corner = min(max(0, w - width // 2), twidth - width)
     top_corner = min(max(0, h - height // 2), theight - height)
-    x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
-    y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    x = x.crop((left_corner, top_corner, left_corner + width, top_corner + height))
+    y = y.crop((left_corner, top_corner, left_corner + width, top_corner + height))
 
     return (x, y)
 
@@ -101,7 +106,7 @@ def class_crop(x, y, crop_ratio, clsid):
     y = y.resize(size_before_crop, resample=Image.NEAREST)
     twidth, theight = x.size
 
-    return class_crop_with_targe(x, y, (width, height), clsid)
+    return class_crop_with_target(x, y, (width, height), clsid)
     
 
 def crop_to_square(x, y):
@@ -109,8 +114,8 @@ def crop_to_square(x, y):
     width, height = x.size
     s = min(width, height)
 
-    x.crop((0, 0, s, s))
-    y.crop((0, 0, s, s))
+    x = x.crop((0, 0, s, s))
+    y = y.crop((0, 0, s, s))
 
     return (x, y)
 
@@ -137,7 +142,7 @@ def random_scale(x, y, scales, factor=1):
     width, height = x.size
 
     if isinstance(scales, tuple):
-        if len(tuple) != 2:
+        if len(scales) != 2:
             raise ValueError("Invalid tuple passed as scales")
         lo, hi = scales
         if isinstance(lo, float) and isinstance(hi, float):
@@ -179,3 +184,39 @@ def random_scale(x, y, scales, factor=1):
     y = y.resize(tsize, resample=Image.NEAREST)
 
     return (x, y)
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt 
+    x = Image.open("static/img/2008_000002.jpg")
+    y = Image.open("static/cls/2008_000002.png")
+
+    print("Random crop to 224 x 224")
+    x, y = random_crop_with_target(x, y, (224, 224))
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.array(x))
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.array(y))
+    plt.show()
+
+    x = Image.open("static/img/2007_003621.jpg")
+    y = Image.open("static/cls/2007_003621.png")
+
+    print("Class crop to 224 x 224 (class 2, bike)")
+    x, y = class_crop_with_target(x, y, (224, 224), 2)
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.array(x))
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.array(y))
+    plt.show()
+
+    x = Image.open("static/img/2007_003621.jpg")
+    y = Image.open("static/cls/2007_003621.png")
+
+    print(f"Random scale with factor in (0.7, 1.3) (initial size: {x.size})")
+    x, y = random_scale(x, y, scales=(0.7, 1.3))
+    plt.subplot(1, 2, 1)
+    plt.imshow(np.array(x))
+    plt.subplot(1, 2, 2)
+    plt.imshow(np.array(y))
+    plt.show()
