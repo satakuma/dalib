@@ -62,6 +62,7 @@ def center_crop_with_target(x, y, target_size):
 
     return (x, y)
 
+
 def center_crop(x, y, crop_ratio):
     assert x.size == y.size
     width, height = x.size
@@ -70,6 +71,7 @@ def center_crop(x, y, crop_ratio):
     y = y.resize(size_before_crop, resample=Image.NEAREST)
 
     return center_crop_with_target(x, y, (width, height))
+    
 
 def class_crop_with_target(x, y, target_size, clsid):
     assert x.size == y.size
@@ -104,7 +106,6 @@ def class_crop(x, y, crop_ratio, clsid):
     size_before_crop = (int(width / crop_ratio), int(height / crop_ratio))
     x = x.resize(size_before_crop, resample=Image.NEAREST)
     y = y.resize(size_before_crop, resample=Image.NEAREST)
-    twidth, theight = x.size
 
     return class_crop_with_target(x, y, (width, height), clsid)
     
@@ -131,12 +132,12 @@ def random_horizontal_flip(x, y):
     return (x, y)
 
 
-def random_scale(x, y, scales, factor=1):
+def random_scale(x, y, scales):
     '''
     scales can be:
         - a tuple of floats (lo, hi)
-        - a tuple of ints
-        - a list of possible sizes
+        - a tuple of ints (lo, hi)
+        - a list of possible sizes [(w, h), ...]
     '''
     assert x.size == y.size
     width, height = x.size
@@ -176,9 +177,6 @@ def random_scale(x, y, scales, factor=1):
     else:
         raise ValueError("Invalid scales argument")
         
-    if factor != 1:
-        raise NotImplementedError("Aligning the size of the image is not supported yet")
-
     tsize = (twidth, theight)
     x = x.resize(tsize, resample=Image.NEAREST)
     y = y.resize(tsize, resample=Image.NEAREST)
