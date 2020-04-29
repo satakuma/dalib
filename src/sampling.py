@@ -48,7 +48,7 @@ class Generator:
         self.class_buckets = {i : [] for i in range(num_classes)}
     
     def reset_perm(self):
-        if self.perm:
+        if self.perm is not None:
             self.perm = np.concatenate((self.perm[self.next:], np.random.permutation(len(self.samples))))
         else:
             self.perm = np.random.permutation(len(self.samples))
