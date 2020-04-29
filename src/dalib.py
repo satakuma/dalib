@@ -47,7 +47,7 @@ def ImageAugmentator(pathlike, *, batch_size, num_classes, target_size=None,
 
         assert all(img[0].size == batch[0][0].size for img in batch)
         xdata = np.array([np.array(img, dtype=np.float32) for img, _ in batch])
-        ydata = np.array([np.array(img, dtype=np.uint16) for _, img in batch])
+        ydata = np.array([np.array(img, dtype=np.uint8) for _, img in batch])
         
         if preprocessing_function:
             xdata = preprocessing_function(xdata)
