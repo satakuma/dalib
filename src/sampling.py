@@ -33,28 +33,49 @@ def get_paths(pathlike, x_dir, y_dir):
     samples = list(zip(xfiles, yfiles))
     return samples
         
-    
-class CachedGenerator:
+
+class Generator:
     def __init__(self, sample_paths, batch_size, num_classes, void_pixel):
         if len(sample_paths) < batch_size:
             raise ValueError("Batch size should not exceed the number of samples")
         self.batch_size = batch_size
         self.num_classes = num_classes
         self.samples = []
+        self.sample_paths = sample_paths
         self.void_pixel = void_pixel
+        self.next = None
+        self.perm = None
         self.class_buckets = {i : [] for i in range(num_classes)}
+    
+    def reset_perm(self):
+        if self.perm:
+            self.perm = np.concatenate((self.perm[self.next:], np.random.permutation(len(self.samples))))
+        else:
+            self.perm = np.random.permutation(len(self.samples))
+        self.next = 0
+    
+
+class CachedGenerator(Generator):
+    def __init__(self, sample_paths, batch_size, num_classes, void_pixel):
+        super(CachedGenerator, self).__init__(sample_paths, batch_size, num_classes, void_pixel)
         for x, y in sample_paths:
             ximg = Image.open(x)
             yimg = Image.open(y)
             ximg.load()
             yimg.load()
             for c in set(yimg.getdata()):
-                if void_pixel and c != void_pixel:
-                    self.class_buckets[c].append(len(self.samples))
+                if void_pixel and c == void_pixel:
+                    continue
+                self.class_buckets[c].append(len(self.samples))
             self.samples.append((ximg, yimg))
+        print(f"Loaded {len(self.samples)} samples")
         
     def get_random_batch(self):
-        return rd.sample(self.samples, self.batch_size), None
+        if not self.next or self.next + self.batch_size > self.perm.shape[0]:
+            self.reset_perm()
+        batch = [self.samples[i] for i in self.perm[self.next: self.next + self.batch_size]]
+        self.next += self.batch_size
+        return batch, None
 
     def get_class_batch(self):
         classes = np.random.randint(low=0, high=self.num_classes, size=self.batch_size)
@@ -62,23 +83,22 @@ class CachedGenerator:
         batch = [self.samples[i] for i in batch]
         return batch, classes
 
-class DynamicGenerator:
+
+class DynamicGenerator(Generator):
     def __init__(self, sample_paths, batch_size, num_classes, void_pixel):
-        if len(sample_paths) < batch_size:
-            raise ValueError("Batch size should not exceed the number of samples")
-        self.batch_size = batch_size
-        self.num_classes = num_classes
-        self.sample_paths = sample_paths
-        self.void_pixel = void_pixel
-        self.class_buckets = {i : [] for i in range(num_classes)}
+        super(DynamicGenerator, self).__init__(sample_paths, batch_size, num_classes, void_pixel)
         for x, y in sample_paths:
             yimg = Image.open(y)
             for c in set(yimg.getdata()):
-                if void_pixel and c != void_pixel:
-                    self.class_buckets[c].append((x, y))
+                if void_pixel and c == void_pixel:
+                    continue
+                self.class_buckets[c].append((x, y))
         
     def get_random_batch(self):
-        samples = rd.sample(self.sample_paths, self.batch_size)
+        if not self.next or self.next + self.batch_size > self.perm.shape[0]:
+            self.reset_perm()
+        samples = [self.sample_paths[i] for i in self.perm[self.next: self.next + self.batch_size]]
+        self.next += self.batch_size
         batch = []
         for x, y in samples:
             ximg = Image.open(x)
